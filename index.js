@@ -1333,7 +1333,10 @@ class ExecPrivilegeService {
           message: `用户已批准，执行权限切换为「${LEVEL_BY_ID.get(request.level)?.labelZh ?? request.level}」`,
         }
       } else {
-        if (request.source === 'restore') this.pendingRestore = undefined
+        if (request.source === 'restore') {
+          this.pendingRestore = undefined
+          this.lastError = undefined
+        }
         result = { approved: false, level: request.level, message: '用户拒绝了执行权限提升' }
       }
     } catch (error) {

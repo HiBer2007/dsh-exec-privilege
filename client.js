@@ -545,11 +545,17 @@ window.__ModuleLoader__.load({
                         `模型请求提升执行权限至「${levelName(pendingLevel ?? { id: pending.level }, lang)}」`,
                         `The model requests execution privilege ${pending.level}`,
                       )
-                    : pick(
-                        lang,
-                        `${pendingRisk === 2 ? '高风险 · ' : ''}将执行权限提升为「${levelName(pendingLevel ?? { id: pending.level }, lang)}」？`,
-                        `${pendingRisk === 2 ? 'High risk · ' : ''}Elevate execution privilege to ${pending.level}?`,
-                      ),
+                    : pending.source === 'restore'
+                      ? pick(
+                          lang,
+                          `恢复上次的执行权限：「${levelName(pendingLevel ?? { id: pending.level }, lang)}」？`,
+                          `Restore the previous execution privilege: ${pending.level}?`,
+                        )
+                      : pick(
+                          lang,
+                          `${pendingRisk === 2 ? '高风险 · ' : ''}将执行权限提升为「${levelName(pendingLevel ?? { id: pending.level }, lang)}」？`,
+                          `${pendingRisk === 2 ? 'High risk · ' : ''}Elevate execution privilege to ${pending.level}?`,
+                        ),
                 ),
                 h(
                   'div',
