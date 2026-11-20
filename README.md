@@ -82,9 +82,8 @@ Invoke-RestMethod "http://127.0.0.1:<port>/exec-privilege/selftest"
   沙箱的 restricted-token runner 从会话 0 的系统令牌创建进程会返回 Win32 740 或
   `0xC0000142`。选择系统级身份时请把当前会话的权限预设切到「完全权限」；`read-only` /
   `workspace-write` 下终端命令会被沙箱拒绝（文件读写工具仍受路径策略约束）。NSudo 式
-  「复制令牌 + `SetTokenInformation(TokenSessionId, 当前交互会话)`」已在
-  `dsh-work/privtest/session1-probe.cjs` 验证可行，但尚未接入插件；接入前必须由用户明确
-  批准一次 SYSTEM 测试。
+  「复制令牌 + `SetTokenInformation(TokenSessionId, 当前交互会话)`」已用 SYSTEM 探针验证
+  可行，但尚未接入插件；接入前必须由用户明确批准一次 SYSTEM 测试。
 - **插件自有子进程不经过本选择器**：只有走 `ctx.shell` 与 `ctx.fs` 的能力会被路由；直接
   调用 `ctx.subprocess` 的插件（例如文档工坊 CLI）仍以 DSH 本体权限运行。终端侧栏同样
   使用独立的终端 seam，不在本选择器范围内。
