@@ -583,9 +583,10 @@ class ExecPrivilegeService {
     })
     this.port = this.server.address().port
     this.token = randomBytes(32).toString('hex')
-    // Restore only selections that need no elevation beyond the Host token.
-    // A saved elevated level on a weaker Host stays pending until the user
-    // confirms again, so a restart never silently re-elevates.
+    // Never silently restore a non-default level. The saved choice only
+    // creates a dedicated confirmation request; the user decides after the
+    // restart. This also makes a forged persistence file harmless: it can at
+    // most ask, not elevate.
     const saved = this.readPersistedLevel()
     this.selected = 'user'
     const startUserWorker = () => {
@@ -594,14 +595,15 @@ class ExecPrivilegeService {
         this.lastError = `默认普通用户执行器启动失败：${errorText(error)}`
       })
     }
-    if (saved === this.hostLevel) {
-      this.selected = saved
-    } else if (saved === 'user') {
-      startUserWorker()
-    } else if (saved !== undefined && LEVEL_BY_ID.has(saved)) {
+    if (saved !== undefined && saved !== 'user' && LEVEL_BY_ID.has(saved)) {
       this.pendingRestore = saved
-      this.lastError = `上次选择的「${LEVEL_BY_ID.get(saved)?.labelZh ?? saved}」在重启后需要重新确认；当前已回到普通用户`
+      this.lastError = `上次选择的「${LEVEL_BY_ID.get(saved)?.labelZh ?? saved}」需要重新确认；当前已回到普通用户`
       startUserWorker()
+      this.createPendingRequest(
+        saved,
+        `上次使用的是「${LEVEL_BY_ID.get(saved)?.labelZh ?? saved}」，是否在本次启动恢复？`,
+        'restore',
+      )
     } else {
       startUserWorker()
     }
@@ -1331,6 +1333,7 @@ class ExecPrivilegeService {
           message: `用户已批准，执行权限切换为「${LEVEL_BY_ID.get(request.level)?.labelZh ?? request.level}」`,
         }
       } else {
+        if (request.source === 'restore') this.pendingRestore = undefined
         result = { approved: false, level: request.level, message: '用户拒绝了执行权限提升' }
       }
     } catch (error) {
