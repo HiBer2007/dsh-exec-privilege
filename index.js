@@ -495,7 +495,7 @@ class AsyncQueue {
 }
 
 /** Host service and HTTP surface for the selector. */
-export const inject = ['webServer', 'tools']
+export const inject = ['webServer', 'tools', 'sandboxPolicy']
 
 class ExecPrivilegeService {
   constructor(ctx) {
@@ -522,6 +522,13 @@ class ExecPrivilegeService {
     this.pendingRequest = undefined
     this.pendingDecision = undefined
     this.pendingTimer = undefined
+    // SYSTEM/TI workers run in session 0, where the Windows ACL runner used by
+    // workspace-write cannot start a process. Those levels therefore run with
+    // the sandbox off: workspace-write is coerced to danger-full-access, while
+    // read-only remains available.
+    this.noWorkspaceSandbox = false
+    this.rawResolve = undefined
+    this.setSandboxMode = undefined
     this.ready = this.init()
     this.ready.catch((error) => {
       this.lastError = errorText(error)
@@ -1131,6 +1138,37 @@ class ExecPrivilegeService {
     return snapshot
   }
 
+  /**
+   * When SYSTEM/TI is selected, a session that still asks for workspace-write
+   * is moved to danger-full-access. The event is the same one the permission
+   * preset UI writes, so the permission button reflects the real policy.
+   */
+  enforceSession(session) {
+    if (!this.noWorkspaceSandbox || session === undefined) return
+    const policy = this.ctx.get('sandboxPolicy')
+    if (policy === undefined) return
+    let mode
+    try {
+      mode = this.rawResolve === undefined
+        ? (policy.overrideOf?.(session) ?? policy.defaultMode)
+        : this.rawResolve({ session })?.mode
+    } catch {
+      mode = undefined
+    }
+    if (mode !== 'workspace-write') return
+    try {
+      this.setSandboxMode?.(session, 'danger-full-access')
+    } catch (error) {
+      this.lastError = `SYSTEM/TI 下关闭工作区沙箱失败：${errorText(error)}`
+    }
+  }
+
+  enforceNoWorkspaceSandbox() {
+    const agents = this.ctx.get('agents')
+    const live = typeof agents?.list === 'function' ? agents.list() : []
+    for (const agent of live) this.enforceSession(agent?.session)
+  }
+
   async setLevel(level, options = {}) {
     await this.ready
     const descriptor = LEVEL_BY_ID.get(level)
@@ -1148,6 +1186,10 @@ class ExecPrivilegeService {
     }
     if (this.switching) throw new Error('正在切换执行权限，请稍候')
     if (level === this.selected) {
+      if (level === 'system' || level === 'trustedinstaller') {
+        this.noWorkspaceSandbox = true
+        this.enforceNoWorkspaceSandbox()
+      }
       if (level === this.hostLevel) return this.state()
       await this.ensureWorker(level)
       return this.state()
@@ -1156,6 +1198,9 @@ class ExecPrivilegeService {
     this.lastError = undefined
     try {
       if (level !== this.hostLevel) await this.ensureWorker(level)
+      const bypassSandbox = level === 'system' || level === 'trustedinstaller'
+      this.noWorkspaceSandbox = bypassSandbox
+      if (bypassSandbox) this.enforceNoWorkspaceSandbox()
       this.selected = level
       this.pendingRestore = undefined
       this.persistLevel(level)
@@ -1573,6 +1618,49 @@ export function apply(ctx) {
     service.dispose()
     unprovide()
   }, 'exec-privilege: service lifecycle')
+
+  // Keep the workspace-write option out of SYSTEM/TI sessions. The permission
+  // preset writes the same `sandbox/mode` event, so coercing the resolved
+  // policy and the session event keeps the button and the execution in sync.
+  const { setSandboxMode } = loadPackage(service.runtimeDir, '@deepseek-ai/dsh-sandbox-policy')
+  service.setSandboxMode = setSandboxMode
+  const policy = ctx.get('sandboxPolicy')
+  if (policy !== undefined && typeof policy.resolve === 'function') {
+    const original = policy.resolve.bind(policy)
+    service.rawResolve = original
+    try {
+      policy.resolve = (request = {}) => {
+        const resolved = original(request)
+        if (service.noWorkspaceSandbox && resolved?.mode === 'workspace-write') {
+          return { ...resolved, mode: 'danger-full-access' }
+        }
+        return resolved
+      }
+      ctx.effect(() => () => {
+        policy.resolve = original
+        service.rawResolve = undefined
+      }, 'exec-privilege: restore sandboxPolicy.resolve')
+    } catch (error) {
+      service.lastError = `无法接管沙箱策略：${errorText(error)}`
+    }
+  }
+  ctx.on('session/event', (session, event) => {
+    if (!service.noWorkspaceSandbox) return
+    if (event?.type !== 'sandbox/mode' || event.data?.mode !== 'workspace-write') return
+    // Let the current commit finish; appending from inside its observer would
+    // re-enter the session append guard.
+    queueMicrotask(() => {
+      if (!service.noWorkspaceSandbox) return
+      try {
+        service.setSandboxMode?.(session, 'danger-full-access')
+      } catch (error) {
+        service.lastError = `SYSTEM/TI 下关闭工作区沙箱失败：${errorText(error)}`
+      }
+    })
+  })
+  ctx.on('agent/created', ({ agent }) => {
+    service.enforceSession(agent?.session)
+  })
 
   // Dedicated confirmation tool. It only creates a request; the approval
   // itself lives in the execution-privilege control, which is cookie-bound to

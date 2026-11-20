@@ -14,6 +14,11 @@
   （TrustedInstaller）启动独立执行器。执行器只监听本机回环地址，并用一次性随机令牌认证。
 - 菜单列出所有级别；**不可达的级别灰显并给出原因**（例如非管理员账户、UAC 被禁用、
   TrustedInstaller 服务被禁用、Windows 无 root）。
+- **SYSTEM / TrustedInstaller 下直接关闭工作区沙箱**：这两个级别的执行器在会话 0，Windows
+  ACL runner 无法从那里创建受限进程，因此插件会把 `workspace-write` 强制改为
+  `danger-full-access`，并同步改写会话的 `sandbox/mode` 事件；工作区写入不再可用，只保留
+  **完全权限**和**只读**。客户端菜单与确认框会显示这一提示。切回管理员/普通用户后，
+  workspace-write 恢复可选。
 - 选择会持久化到 `~/.dsh/exec-privilege.json`；重启后**不会静默恢复**任何非普通用户级别：
   启动时会在专用确认框中询问是否恢复，用户拒绝或超时则保持普通用户。
 - 切换是进程级的：新启动的工具使用新级别，已经在运行的命令继续以旧级别跑完。
@@ -78,12 +83,12 @@ Invoke-RestMethod "http://127.0.0.1:<port>/exec-privilege/selftest"
 
 ## 已知限制
 
-- **SYSTEM / TrustedInstaller 与工作区内修改沙箱不兼容**：执行器目前在会话 0，Windows ACL
-  沙箱的 restricted-token runner 从会话 0 的系统令牌创建进程会返回 Win32 740 或
-  `0xC0000142`。选择系统级身份时请把当前会话的权限预设切到「完全权限」；`read-only` /
-  `workspace-write` 下终端命令会被沙箱拒绝（文件读写工具仍受路径策略约束）。NSudo 式
-  「复制令牌 + `SetTokenInformation(TokenSessionId, 当前交互会话)`」已用 SYSTEM 探针验证
-  可行，但尚未接入插件；接入前必须由用户明确批准一次 SYSTEM 测试。
+- **SYSTEM / TrustedInstaller 不运行工作区沙箱**：执行器目前在会话 0，Windows ACL 沙箱的
+  restricted-token runner 从会话 0 的系统令牌创建进程会返回 Win32 740 或 `0xC0000142`。
+  插件因此在选择了这两个级别时**直接关闭工作区沙箱**：把 `workspace-write` 强制改为
+  `danger-full-access`，并同步会话的 `sandbox/mode`；只保留完全权限/只读。`read-only` 仍
+  受只读围栏约束。NSudo 式「复制令牌 + `SetTokenInformation(TokenSessionId, 当前交互会话)`」
+  已用 SYSTEM 探针验证可行，但尚未接入插件；接入前必须由用户明确批准一次 SYSTEM 测试。
 - **插件自有子进程不经过本选择器**：只有走 `ctx.shell` 与 `ctx.fs` 的能力会被路由；直接
   调用 `ctx.subprocess` 的插件（例如文档工坊 CLI）仍以 DSH 本体权限运行。终端侧栏同样
   使用独立的终端 seam，不在本选择器范围内。

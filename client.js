@@ -479,6 +479,17 @@ window.__ModuleLoader__.load({
                   null,
                   `${pick(lang, '工具执行', 'Tools')}：${effective?.ready === false ? pick(lang, '正在准备执行器…', 'preparing worker…') : identityText(effective?.identity, lang)}`,
                 ),
+                current.id === 'system' || current.id === 'trustedinstaller'
+                  ? h(
+                      'div',
+                      { style: { color: '#b45309', marginTop: 4, whiteSpace: 'pre-wrap' } },
+                      pick(
+                        lang,
+                        'SYSTEM/TI 下沙箱已关闭：工作区写入不可用，仅完全权限/只读。',
+                        'With SYSTEM/TI the sandbox is off: workspace-write is unavailable; use Full access or Read-only.',
+                      ),
+                    )
+                  : null,
                 state.pendingRestore
                   ? h(
                       'div',
@@ -599,6 +610,17 @@ window.__ModuleLoader__.load({
                           'Normal user uses a Medium-integrity token with Administrators deny-only; this is the safe default.',
                         ),
                 ),
+                pendingLevel?.id === 'system' || pendingLevel?.id === 'trustedinstaller'
+                  ? h(
+                      'div',
+                      { style: { marginTop: 6, color: '#b45309', whiteSpace: 'pre-wrap' } },
+                      pick(
+                        lang,
+                        '确认后会自动关闭工作区沙箱：工作区写入不可用，仅完全权限/只读。',
+                        'Confirming turns the workspace sandbox off: workspace-write is unavailable; use Full access or Read-only.',
+                      ),
+                    )
+                  : null,
                 pendingRisk === 2
                   ? h(
                       'label',
