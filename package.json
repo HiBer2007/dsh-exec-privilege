@@ -1,0 +1,45 @@
+{
+  "name": "@local/dsh-exec-privilege",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Execution-privilege selector for DSH Desktop: normal user, administrator, SYSTEM, TrustedInstaller.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HiBer2007/dsh-exec-privilege.git"
+  },
+  "homepage": "https://github.com/HiBer2007/dsh-exec-privilege#readme",
+  "exports": {
+    ".": "./index.js",
+    "./fs": "./fs.js",
+    "./shell": "./shell.js",
+    "./native": "./native.cjs",
+    "./worker": "./worker.cjs",
+    "./client": "./client.js"
+  },
+  "files": [
+    "index.js",
+    "fs.js",
+    "shell.js",
+    "native.cjs",
+    "worker.cjs",
+    "runtime.js",
+    "client.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-layout"
+      ]
+    }
+  }
+}

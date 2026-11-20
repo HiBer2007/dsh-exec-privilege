@@ -1,0 +1,15 @@
+# Execution privilege selector: replace the shipped fs/shell providers with
+# privilege-routing subclasses that keep the same sandbox policy seam.
+- id: fs-sandbox
+  disabled: true
+- id: pwsh-sandbox
+  disabled: true
+- insert:
+    - id: exec-privilege
+      name: '@local/dsh-exec-privilege'
+      config: {}
+    - id: fs-privileged
+      name: '@local/dsh-exec-privilege/fs'
+    - id: shell-privileged
+      name: '@local/dsh-exec-privilege/shell'
+      disabled: !!js process.platform !== 'win32'
