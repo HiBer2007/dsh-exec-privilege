@@ -876,10 +876,9 @@ class ExecPrivilegeService {
 
   activeConsoleSession() {
     try {
-      const api = native.bindings(this.runtimeDir)
-      // WTSGetActiveConsoleSessionId is not part of the shared binding table;
-      // fall back to the host's own session if koffi cannot resolve it.
-      return this.host?.sessionId
+      // WTSGetActiveConsoleSessionId is the right answer when the Host itself
+      // runs in session 0 as SYSTEM/TI; fall back to the Host token's session.
+      return native.activeConsoleSessionId(this.runtimeDir)
     } catch {
       return this.host?.sessionId
     }
