@@ -1102,6 +1102,10 @@ class ExecPrivilegeService {
   }
 
   state() {
+    // The 3s client poll is also a cheap safety net: if a workspace-write
+    // event slipped past the observer, correct the session projection before
+    // reporting the selector state.
+    if (this.noWorkspaceSandbox) this.enforceNoWorkspaceSandbox()
     const snapshot = {
       ok: true,
       platform: process.platform,
